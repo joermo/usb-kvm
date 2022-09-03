@@ -1,0 +1,100 @@
+# pip install monitorcontrol
+# pip install pyusb
+# pip install libusb-package
+
+from tkinter import W
+from monitorcontrol import get_monitors
+import time
+import libusb_package
+import usb.core
+import usb.backend.libusb1
+import json
+import sys
+import argparse
+
+
+def is_usb_connected(device_id):
+    ven_prod = device_id.split(':')
+    vendor_id = int(ven_prod[0])
+    prod_id = int(ven_prod[1])
+    libusb1_backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+    connected = usb.core.find(find_all=True, backend=libusb1_backend)
+    for c in connected:
+        if c.idVendor == vendor_id and c.idProduct == prod_id:
+            return True
+    return False
+
+def switch_monitor_inputs(config, is_connected, smart_mode_enabled, log_source):
+    monitors = config['monitors']
+    for i, monitor in enumerate(get_monitors()):
+        with monitor:
+            input_to_set = monitors[str(i + 1)]["on_connect_input"] if is_connected else monitors[str(i + 1)]["on_disconnect_input"]
+            current_source = str(monitor.get_input_source()).split('.')[1] # get last part of enum
+            if log_source:
+                print(f"Monitor {i + 1} current source: {current_source}")
+            if smart_mode_enabled:
+                if current_source == input_to_set:
+                    print(f"Monitor {str(i + 1)} already set to input {input_to_set}")
+                else:
+                    print(f"Setting display {i + 1} to {input_to_set}")
+                    monitor.set_input_source(input_to_set)
+            else:
+                print(f"Setting display {i + 1} to {input_to_set}")
+                monitor.set_input_source(input_to_set)
+
+
+def get_connected_devices():
+    libusb1_backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
+    connected = usb.core.find(find_all=True, backend=libusb1_backend)
+    return set([f"{c.idVendor}:{c.idProduct}" for c in connected])
+    
+
+def run_device_finder():
+    print(f"Building device list...")
+    print(f"Plug in or unplug a device to view its ID...")
+    try:
+        connected = get_connected_devices()
+        while True:
+            time.sleep(0.25)
+            new_connected = get_connected_devices()
+            if connected != new_connected:
+                removed = list(connected - new_connected)
+                added = list(new_connected - connected)
+                print(f"Added: {added}    Removed: {removed}")
+            connected = new_connected
+    except:
+        print("Exiting device finder")
+        sys.exit()
+
+
+def run_kvm(config, smart_mode_enabled, verbose):
+    usb_id = config['usb_device']
+    is_connected = is_usb_connected(usb_id)
+    if is_connected:
+        print(f'Device {usb_id} is connected')
+    else:
+        print(f'Device {usb_id} is not connected')
+    switch_monitor_inputs(config, is_connected, smart_mode_enabled, verbose)
+    while True:
+        is_connected_new = is_usb_connected(usb_id)
+        if is_connected != is_connected_new:
+            print("USB device switched")
+            switch_monitor_inputs(config, is_connected_new, smart_mode_enabled, verbose)
+            is_connected = is_connected_new
+        time.sleep(.5)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', action='store_true', default=False, help='Use this flag to run the device finder to poll and print any changes in connected USB devices.')
+    parser.add_argument('-c', action='store_true', default='config.json', help='Specify the config location. Else, default to config.json.')
+    parser.add_argument('-d', action='store_true', default=False, help='Use this flag to disable smart detection of current display inputs.')
+    parser.add_argument('-v', action='store_true', default=False, help='Use this flag to enable verbose logging of monitor sources when switching.')
+    args = parser.parse_args()
+    if args.f:
+        run_device_finder()
+    config_location = args.c
+    dumb_mode = args.d
+    with open(config_location, 'r') as f:
+        kvm_config = json.load(f)
+    run_kvm(kvm_config, smart_mode_enabled=not dumb_mode, verbose=args.v)

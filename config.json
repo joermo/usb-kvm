@@ -1,0 +1,13 @@
+{
+    "usb_device": "6048:772",
+    "monitors": {
+        "1": {
+            "on_connect_input": "DP1",
+            "on_disconnect_input": "HDMI1"
+        },
+        "2": {
+            "on_connect_input": "DP1",
+            "on_disconnect_input": "HDMI2"
+        }
+    }
+}
