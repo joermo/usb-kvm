@@ -2,7 +2,6 @@
 # pip install pyusb
 # pip install libusb-package
 
-from tkinter import W
 from monitorcontrol import get_monitors
 import time
 import libusb_package
@@ -47,21 +46,49 @@ def switch_monitor_inputs(config, is_connected, smart_mode_enabled, log_source):
 def get_connected_devices():
     libusb1_backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
     connected = usb.core.find(find_all=True, backend=libusb1_backend)
-    return set([f"{c.idVendor}:{c.idProduct}" for c in connected])
+    return set(connected)
+
+
+def try_get_string(dev, index, langid = None, default_str_i0 = "Unknown", default_access_error = "Unknown"):
+    if index == 0 :
+        string = default_str_i0
+    else:
+        try:
+            if langid is None:
+                string = usb.util.get_string(dev, index)
+            else:
+                string = usb.util.get_string(dev, index, langid)
+        except :
+            string = default_access_error
+    return string
+
     
+def get_device_info(device):
+    manufacturer = try_get_string(device, device.iManufacturer)
+    dev_name = try_get_string(device, device.iProduct)
+    return f"{device.idVendor}:{device.idProduct} ({manufacturer} {dev_name})"
+
 
 def run_device_finder():
-    print("Running device finder -- press Ctrl+C to quit...")
     print(f"Building device list...")
+    print("---------------Monitors---------------")
+    for i, monitor in enumerate(get_monitors()):
+        with monitor:
+            print(f"Monitor {i + 1}: {monitor.get_vcp_capabilities()['model']}")
+    connected = get_connected_devices()
+    print("---------------USB Devices------------")
+    for c in connected:
+        print(get_device_info(c))
+    print("--------------------------------------")
+    print("\n\nRunning device finder -- press Ctrl+C to quit...")
     print(f"Plug in or unplug a device to view its ID...")
     try:
-        connected = get_connected_devices()
         while True:
             time.sleep(0.25)
             new_connected = get_connected_devices()
             if connected != new_connected:
-                removed = list(connected - new_connected)
-                added = list(new_connected - connected)
+                removed = [f"{r.idVendor}:{r.idProduct}" for r in (connected - new_connected)]
+                added = [f"{a.idVendor}:{a.idProduct}" for a in (new_connected - connected)]
                 print(f"Added: {added}    Removed: {removed}")
             connected = new_connected
     except:
