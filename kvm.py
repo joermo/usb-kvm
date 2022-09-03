@@ -24,6 +24,7 @@ def is_usb_connected(device_id):
             return True
     return False
 
+
 def switch_monitor_inputs(config, is_connected, smart_mode_enabled, log_source):
     monitors = config['monitors']
     for i, monitor in enumerate(get_monitors()):
@@ -50,6 +51,7 @@ def get_connected_devices():
     
 
 def run_device_finder():
+    print("Running device finder -- press Ctrl+C to quit...")
     print(f"Building device list...")
     print(f"Plug in or unplug a device to view its ID...")
     try:
@@ -87,7 +89,7 @@ def run_kvm(config, smart_mode_enabled, verbose):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', action='store_true', default=False, help='Use this flag to run the device finder to poll and print any changes in connected USB devices.')
-    parser.add_argument('-c', action='store_true', default='config.json', help='Specify the config location. Else, default to config.json.')
+    parser.add_argument('-c', type=str, nargs='?', const="bar", default='config.json', help='Specify the config location. Else, default to config.json.')
     parser.add_argument('-d', action='store_true', default=False, help='Use this flag to disable smart detection of current display inputs.')
     parser.add_argument('-v', action='store_true', default=False, help='Use this flag to enable verbose logging of monitor sources when switching.')
     args = parser.parse_args()
