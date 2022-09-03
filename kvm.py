@@ -8,8 +8,8 @@ import libusb_package
 import usb.core
 import usb.backend.libusb1
 import json
-import sys
 import argparse
+import os
 
 
 def is_usb_connected(device_id):
@@ -69,12 +69,32 @@ def get_device_info(device):
     return f"{device.idVendor}:{device.idProduct} ({manufacturer} {dev_name})"
 
 
+def create_config(monitors):
+    config = {}
+    device_id = input("Enter the USB device ID: ")
+    config['usb_device'] = device_id
+    config['monitors'] = {}
+    for mon_num, mon_name in monitors.items():
+        print("--------------------------------------")
+        print(f"Monitor {mon_num} {mon_name}:")
+        on_connect = input("on_connect input: ")
+        on_disconnect = input("on_disconnect input: ")
+        config['monitors'][mon_num] = {"on_connect_input": on_connect, "on_disconnect_input": on_disconnect}
+    config_json = json.dumps(config, indent = 4) 
+    with open('config.json', 'w') as f:
+        print(config_json, file=f)
+    print(f"Config file output to: {os.getcwd()}")
+
+
 def run_device_finder():
     print(f"Building device list...")
     print("---------------Monitors---------------")
+    monitors = {}
     for i, monitor in enumerate(get_monitors()):
         with monitor:
-            print(f"Monitor {i + 1}: {monitor.get_vcp_capabilities()['model']}")
+            inputs = [str(i).split('.')[1] for i in monitor.get_vcp_capabilities()['inputs']]
+            monitors[i+1] = f"{monitor.get_vcp_capabilities()['model']} {inputs}"
+            print(f"Monitor {i+1}: {monitors[i+1]}")
     connected = get_connected_devices()
     print("---------------USB Devices------------")
     for c in connected:
@@ -89,11 +109,14 @@ def run_device_finder():
             if connected != new_connected:
                 removed = [f"{r.idVendor}:{r.idProduct}" for r in (connected - new_connected)]
                 added = [f"{a.idVendor}:{a.idProduct}" for a in (new_connected - connected)]
-                print(f"Added: {added}    Removed: {removed}")
+                print(f"Connected: {added}    Disconnected: {removed}")
             connected = new_connected
-    except:
+    except KeyboardInterrupt:
         print("Exiting device finder")
-        sys.exit()
+    
+    to_create_config = ("Y" == (input("Do you want to create a new config? (Y/N): ").upper()))
+    if to_create_config:
+        create_config(monitors)
 
 
 def run_kvm(config, smart_mode_enabled, verbose):
@@ -122,8 +145,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.f:
         run_device_finder()
-    config_location = args.c
-    dumb_mode = args.d
-    with open(config_location, 'r') as f:
-        kvm_config = json.load(f)
-    run_kvm(kvm_config, smart_mode_enabled=not dumb_mode, verbose=args.v)
+    else:
+        config_location = args.c
+        dumb_mode = args.d
+        with open(config_location, 'r') as f:
+            kvm_config = json.load(f)
+        run_kvm(kvm_config, smart_mode_enabled=not dumb_mode, verbose=args.v)
