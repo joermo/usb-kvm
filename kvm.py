@@ -58,7 +58,7 @@ def try_get_string(dev, index, langid = None, default_str_i0 = "Unknown", defaul
                 string = usb.util.get_string(dev, index)
             else:
                 string = usb.util.get_string(dev, index, langid)
-        except :
+        except Exception:
             string = default_access_error
     return string
 
