@@ -2,6 +2,10 @@
 # pip install pyusb
 # pip install libusb-package
 
+# Package into single executable:
+# pip install pyinstaller
+# pyinstaller --onefile kvm.py
+
 from monitorcontrol import get_monitors
 import time
 import libusb_package
