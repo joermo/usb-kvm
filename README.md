@@ -9,7 +9,7 @@ python3 -m venv ./venv
 source ./venv/bin/activate
 pip install -r requirements.txt
 ```
-This script requires read/write access to /dev/i2c devices. If you're on linux, proceed with creating a new group and assigning to yourself by following the below instructions. Else you can run the script as root, or assign temporary access to to /dev/i2c via `sudo chmod a+rw /dev/i2c-*`.
+This script requires read/write access to `/dev/i2c` devices. If you're on linux, proceed with creating a new group and assigning to yourself by following the below instructions. Else you can run the script as root, or assign temporary access via `sudo chmod a+rw /dev/i2c-*`.
 ```
 sudo groupadd i2c
 sudo chown :i2c /dev/i2c-*
@@ -36,10 +36,10 @@ KVM is configured via the following configuration structure:
     }
 }
 ```
-`usb_device` is the USB device ID that is polled intermittently to update the connected monitors depending on its connected status. 
-`monitors` represents the list of monitors connected/to be updated by the script
-`on_connect_input` is the monitor input to use when the USB device is `connected` to the host
-`on_disconnect_input` is the monitor input to use when the USB device is `NOT disconnected` to the host
+- `usb_device` is the USB device ID that is polled intermittently to update the connected monitors depending on its connected status.
+- `monitors` represents the list of monitors connected/to be updated by the script
+- `on_connect_input` is the monitor input to use when the USB device is `connected` to the host
+- `on_disconnect_input` is the monitor input to use when the USB device is `NOT disconnected` to the host
 
 The monitors must be in order that the script setup detects them in. For more information, see `-f` in the arguments section.
 
@@ -47,7 +47,7 @@ The monitors must be in order that the script setup detects them in. For more in
 ## Arguments
 ```
 -h  :   Display argument help
--f  :   Run kvm in device finder/setup mode. Follow the displayed prompts to complete initial setup and create KVM config file.
+-f  :   Run KVM in device finder/setup mode. Follow the displayed prompts to complete initial setup and create KVM config file.
 -d  :   Enable compatibility 'dumb monitor' flag. Some monitors will not properly display the currently used input option over DDC/CI, so logic based on the current input selection cannot be leveraged. Hence, this will ensure the correct input selection is set. Will cause initial screen flicker upon startup.
 -c  :   Specify the KVM config directory. If not provided, use ./config.json.
 -v  :   Use this flag to enable verbose logging of monitor sources when switching.
