@@ -1,5 +1,5 @@
 # USB-KVM
-Turn an ordinary USB Switch into a full KVM by polling and monitoring USB connect/disconnect events and sending DDC/CI signals to switch input according to a configuration file.
+Turn an ordinary USB Switch into a full KVM by polling and monitoring USB connect/disconnect events and sending DDC/CI signals to switch display input according to a configuration file.
 
 ## Installation
 ```sh
@@ -39,7 +39,7 @@ KVM is configured via the following configuration structure:
 - `usb_device` is the USB device ID that is polled intermittently to update the connected monitors depending on its connected status.
 - `monitors` represents the list of monitors connected/to be updated by the script
 - `on_connect_input` is the monitor input to use when the USB device is `connected` to the host
-- `on_disconnect_input` is the monitor input to use when the USB device is `NOT disconnected` to the host
+- `on_disconnect_input` is the monitor input to use when the USB device is `NOT connected` to the host
 
 The monitors must be in order that the script setup detects them in. For more information, see `-f` in the arguments section.
 
@@ -54,7 +54,7 @@ The monitors must be in order that the script setup detects them in. For more in
 ```
 
 - Using `-f` for initial configuration to remove any annoying guesswork is highly encouraged.
-- If display inputs only switch once and won't switch back, try using the `-d` flag alongside `-v`.
+- If monitor inputs only switch once and won't switch back, try using the `-d` flag alongside `-v`.
 
 ## Running script directly
 python3 kvm.py
