@@ -3,11 +3,15 @@
     "monitors": {
         "1": {
             "on_connect_input": "DP1",
-            "on_disconnect_input": "HDMI1"
+            "on_disconnect_input": "HDMI1",
+            "enable_actions": true,
+            "on_connect_actions": ["disable_switch", "power_on"],
+            "on_disconnect_actions": ["disable_switch", "power_off"]
         },
         "2": {
             "on_connect_input": "DP1",
-            "on_disconnect_input": "HDMI2"
+            "on_disconnect_input": "HDMI2",
+            "enable_actions": true
         }
     }
 }

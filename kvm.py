@@ -19,11 +19,39 @@ def is_usb_connected(device_id):
             return True
     return False
 
+def execute_actions(actions, monitor):
+    for action in actions:
+        if action == "power_off": monitor.set_power_mode("off_soft")
+        if action == "power_on": monitor.set_power_mode("on")
+
+
+def execute_monitor_actions(is_connected, config, monitor_num, monitor):
+    cur_monitor_config = config['monitors'][str(monitor_num + 1 )]
+    enable_actions = cur_monitor_config.get('enable_actions', False)
+    skip_switch = False
+    if not enable_actions:
+        return skip_switch
+    connect_actions = cur_monitor_config.get('on_connect_actions', [])
+    disconnect_actions = cur_monitor_config.get('on_disconnect_actions', [])
+
+    if "disable_switch" in disconnect_actions:
+        skip_switch = True
+    if is_connected:
+        execute_actions(connect_actions, monitor)
+    else:
+        execute_actions(disconnect_actions, monitor)
+    return skip_switch
+
+
+
 
 def switch_monitor_inputs(config, is_connected, smart_mode_enabled, log_source):
     monitors = config['monitors']
     for i, monitor in enumerate(get_monitors()):
         with monitor:
+            skip_switch = execute_monitor_actions(is_connected, config, i, monitor)
+            if skip_switch:
+                continue
             input_to_set = monitors[str(i + 1)]["on_connect_input"] if is_connected else monitors[str(i + 1)]["on_disconnect_input"]
             current_source = str(monitor.get_input_source()).split('.')[1] # get last part of enum
             if log_source:
