@@ -6,6 +6,7 @@ import usb.backend.libusb1
 import json
 import argparse
 import os
+import struct
 
 
 def is_usb_connected(device_id):
@@ -25,7 +26,15 @@ def switch_monitor_inputs(config, is_connected, smart_mode_enabled, log_source):
     for i, monitor in enumerate(get_monitors()):
         with monitor:
             input_to_set = monitors[str(i + 1)]["on_connect_input"] if is_connected else monitors[str(i + 1)]["on_disconnect_input"]
-            current_source = str(monitor.get_input_source()).split('.')[1] # get last part of enum
+            source_not_found = True
+            while source_not_found:
+                try:
+                    current_source = str(monitor.get_input_source()).split('.')[1] # get last part of enum
+                    source_not_found = False
+                except struct.error:
+                    print("Error getting input source -- retrying...")
+                    time.sleep(0.25)
+
             if log_source:
                 print(f"Monitor {i + 1} current source: {current_source}")
             if smart_mode_enabled:
@@ -83,7 +92,7 @@ def create_config(monitors):
 
 
 def run_device_finder():
-    print(f"Building device list...")
+    print("Building device list...")
     print("---------------Monitors---------------")
     monitors = {}
     for i, monitor in enumerate(get_monitors()):
@@ -97,7 +106,7 @@ def run_device_finder():
         print(get_device_info(c))
     print("--------------------------------------")
     print("\n\nRunning device finder -- press Ctrl+C to quit...")
-    print(f"Plug in or unplug a device to view its ID...")
+    print("Plug in or unplug a device to view its ID...")
     try:
         while True:
             time.sleep(0.25)
