@@ -65,3 +65,7 @@ Some may find it helpful to package USB-KVM into a standalone executable for eas
 pip install pyinstaller
 pyinstaller --onefile kvm.py
 ```
+
+
+## Diagram
+![Diagram of USB-KVM](./usb-kvm-diagram.png)
