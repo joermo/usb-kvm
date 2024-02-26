@@ -1,0 +1,18 @@
+{
+  "usb_device": "6048:772",
+  "enable_smart_switching": true,
+  "monitors": [
+    {
+      "number": 0,
+      "name": "S2721DGF",
+      "on_connect_input": "DP1",
+      "on_disconnect_input": "HDMI2"
+    },
+    {
+      "number": 1,
+      "name": "Unknown",
+      "on_connect_input": "DP1",
+      "on_disconnect_input": "DP1"
+    }
+  ]
+}
