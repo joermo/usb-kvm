@@ -5,14 +5,14 @@
     {
       "number": 0,
       "name": "S2721DGF",
-      "on_connect_input": "DP1",
-      "on_disconnect_input": "HDMI2"
+      "on_connect_state": "DP1",
+      "on_disconnect_state": "HDMI2"
     },
     {
       "number": 1,
       "name": "Unknown",
-      "on_connect_input": "DP1",
-      "on_disconnect_input": "DP1"
+      "on_connect_state": "DP1",
+      "on_disconnect_state": "DP1"
     }
   ]
 }

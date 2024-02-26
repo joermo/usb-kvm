@@ -20,8 +20,8 @@ class MonitorState(str, Enum):
 class MonitorConfig(BaseModel):
     number: int
     name: str | None
-    on_connect_input: MonitorState
-    on_disconnect_input: MonitorState
+    on_connect_state: MonitorState
+    on_disconnect_state: MonitorState
 
 class KVMConfig(BaseModel):
     usb_device: str
@@ -75,7 +75,7 @@ def get_controllable_monitors(refresh: bool = False) -> List[bool]:
 
 def get_monitor_state(mon_num: int, monitor: Monitor, monitor_config: MonitorConfig) -> MonitorState:
     """ Derives the provided monitor's MonitorState based on the configuration and current monitor state. """
-    monitor_config.on_connect_input  # TODO use this to derive the current state that may not be input specific
+    monitor_config.on_connect_state  # TODO use this to derive the current state that may not be input specific
     attempt_count = 0
     with monitor:
         while attempt_count < 20:
@@ -113,7 +113,7 @@ def handle_monitor_updates(kvm_config: KVMConfig, usb_connected: bool):
             print(f'Monitor {monitor_number} cannot be controlled. Skipping updates...')
             continue
         cur_monitor = monitors[monitor_number]
-        desired_state = monitor_config.on_connect_input if usb_connected else monitor_config.on_disconnect_input
+        desired_state = monitor_config.on_connect_state if usb_connected else monitor_config.on_disconnect_state
         if kvm_config.enable_smart_switching:
             current_state = get_monitor_state(monitor_number, cur_monitor, monitor_config)
             if current_state != desired_state:
@@ -228,8 +228,8 @@ def run_config_creator():
         monitor_configs.append(MonitorConfig(
             number=i,
             name=monitor_name,
-            on_connect_input=on_connect_state,
-            on_disconnect_input=on_disconnect_state
+            on_connect_state=on_connect_state,
+            on_disconnect_state=on_disconnect_state
         ))
     enable_smart = 'Y' == input('Would you like to enable smart state switching? (Y/N): ').upper()
     kvm_config = KVMConfig(
