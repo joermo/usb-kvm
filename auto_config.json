@@ -1,18 +1,18 @@
 {
   "usb_device": "6048:772",
-  "enable_smart_switching": true,
+  "enable_smart_switching": false,
   "monitors": [
     {
       "number": 0,
-      "name": "S2721DGF",
+      "name": "Dell AW3821DW",
       "on_connect_state": "DP1",
-      "on_disconnect_state": "HDMI2"
+      "on_disconnect_state": "DP1"
     },
     {
       "number": 1,
-      "name": "Unknown",
+      "name": "S2721DGF",
       "on_connect_state": "DP1",
-      "on_disconnect_state": "DP1"
+      "on_disconnect_state": "HDMI2"
     }
   ]
 }

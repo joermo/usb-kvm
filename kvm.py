@@ -2,12 +2,13 @@ from enum import Enum
 from monitorcontrol import get_monitors,  Monitor
 import time
 import libusb_package
-from pydantic import BaseModel
-from typing import List, Set
+from pydantic import BaseModel, Field
+from typing import List, Set, Dict, Tuple
 import usb.core
 from usb.core import Device
 import usb.backend.libusb1
 import struct
+import sys
 
 class MonitorState(str, Enum):
     DP1 = 'DP1'
@@ -22,6 +23,7 @@ class MonitorConfig(BaseModel):
     name: str | None
     on_connect_state: MonitorState
     on_disconnect_state: MonitorState
+    is_controllable: bool = True
 
 class KVMConfig(BaseModel):
     usb_device: str
@@ -34,7 +36,9 @@ class KVMException(Exception):
 
 
 libusb1_backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
-controllable_monitors: List[bool] = []
+WIN_PLATFORM = sys.platform == 'win32'
+monitor_config_map: Dict[str, MonitorConfig] = {}
+KVM_CONFIG = None
 
 def is_usb_connected(device_id: str) -> bool:
     """ Check if a USB device is connected based on its ID in the format 'vendor_id:product_id' """
@@ -47,13 +51,13 @@ def is_usb_connected(device_id: str) -> bool:
     return connected is not None
 
 
-def is_controllable(monitor: Monitor) -> bool:
+def poll_if_monitor_controllable(monitor: Monitor) -> bool:
     """ Check if a monitor can be controlled by monitorcontrol. Return false if not. """
     with monitor:
         retry_count = 0
         while retry_count < 5:
             try:
-                monitor.get_vcp_capabilities()
+                str(monitor.get_input_source()).split('.')[1]
                 return True
             except Exception:
                 retry_count += 1
@@ -61,19 +65,38 @@ def is_controllable(monitor: Monitor) -> bool:
     return False
 
 
-def get_controllable_monitors(refresh: bool = False) -> List[bool]:
-    """ 
-        Determines which monitors are controllable by monitorcontrol.
-        Returns a list in the format:
-            list[monitor_idx]=controllable
-    """
-    global controllable_monitors
-    if refresh or len(controllable_monitors) == 0:
-        controllable_monitors = [is_controllable(monitor) for monitor in get_monitors()]
-    return controllable_monitors
+def get_monitor_id(monitor: Monitor) -> str:
+    if WIN_PLATFORM:
+        return monitor.vcp.hmonitor.value  # transient value, changes any time devices are unplugged
+    else:
+        return monitor.vcp.bus_number 
 
 
-def get_monitor_state(mon_num: int, monitor: Monitor, monitor_config: MonitorConfig) -> MonitorState:
+def build_monitor_config_map():
+    global monitor_config_map
+    monitors = get_monitors()
+    configs = KVM_CONFIG.monitors
+    if len(monitors) != len(KVM_CONFIG.monitors):
+        print('The number of connected monitors does not match the configured count. Retrying...')
+        time.sleep(1)
+        build_monitor_config_map()
+    monitor_config_map = {}
+    for monitor, config in zip(monitors, configs):
+        monitor_id = get_monitor_id(monitor)
+        controllable = poll_if_monitor_controllable(monitor)
+        config.is_controllable = controllable
+        monitor_config_map[monitor_id] = config
+
+
+def get_config_for_monitor(monitor: Monitor) -> MonitorConfig | None:
+    global monitor_config_map
+    if monitor_config_map is None or len(monitor_config_map) == 0:
+        build_monitor_config_map()
+    monitor_id = get_monitor_id(monitor)
+    return monitor_config_map.get(monitor_id, None)
+
+
+def get_monitor_state(monitor: Monitor, monitor_config: MonitorConfig) -> MonitorState:
     """ Derives the provided monitor's MonitorState based on the configuration and current monitor state. """
     monitor_config.on_connect_state  # TODO use this to derive the current state that may not be input specific
     attempt_count = 0
@@ -82,7 +105,7 @@ def get_monitor_state(mon_num: int, monitor: Monitor, monitor_config: MonitorCon
             try:
                 state = str(monitor.get_input_source()).split('.')[1]
                 state = MonitorState(state)
-                print(f'Monitor {mon_num} current state is: {state}')
+                print(f'Monitor {monitor_config.number} current state is: {state}')
                 return state
             except struct.error as e:
                 print(f'Error getting monitor state: {e}')
@@ -91,14 +114,14 @@ def get_monitor_state(mon_num: int, monitor: Monitor, monitor_config: MonitorCon
     raise KVMException(f'Error getting monitor state after {attempt_count} attempts')
 
 
-def update_monitor_state(mon_num: int, monitor: Monitor, desired_state: MonitorState):
+def update_monitor_state(mon_config: MonitorConfig, monitor: Monitor, desired_state: MonitorState):
     """ Updates the provided monitor's state to match that of the desired_state MonitorState. """
     with monitor:
-        print(f'Updating monitor {mon_num} state to {desired_state.value}')
+        print(f'Updating monitor {mon_config.number} state to {desired_state.value}')
         monitor.set_input_source(desired_state.value)
 
 
-def handle_monitor_updates(kvm_config: KVMConfig, usb_connected: bool):
+def handle_monitor_updates(usb_connected: bool):
     """
         Handles the monitor updates based  on the KVM config and whether the usb device is connected.
         If the monitor is uncontrollable by monitorcontrol, omit making any changes to its state.
@@ -106,34 +129,40 @@ def handle_monitor_updates(kvm_config: KVMConfig, usb_connected: bool):
         Else, the monitor state will be forced to match the configred target state.
     """
     monitors: List[Monitor] = get_monitors()
-    controllable_monitors = get_controllable_monitors()
-    for monitor_config in kvm_config.monitors:
-        monitor_number = monitor_config.number
-        if controllable_monitors[monitor_number] is False:
-            print(f'Monitor {monitor_number} cannot be controlled. Skipping updates...')
+    for monitor in monitors:
+        config: MonitorConfig
+        config = get_config_for_monitor(monitor)
+        if config is None:
+            build_monitor_config_map()
+            handle_monitor_updates(usb_connected)
+            return
+        if not config.is_controllable:
+            print(f'Monitor {config.number} cannot be controlled. Skipping updates...')
             continue
-        cur_monitor = monitors[monitor_number]
-        desired_state = monitor_config.on_connect_state if usb_connected else monitor_config.on_disconnect_state
-        if kvm_config.enable_smart_switching:
-            current_state = get_monitor_state(monitor_number, cur_monitor, monitor_config)
+        desired_state = config.on_connect_state if usb_connected else config.on_disconnect_state
+        if KVM_CONFIG.enable_smart_switching:
+            current_state = get_monitor_state(monitor, config)
             if current_state != desired_state:
                 print(current_state != desired_state)
-                update_monitor_state(monitor_number, cur_monitor, desired_state)
+                update_monitor_state(config, monitor, desired_state)
             continue
-        update_monitor_state(monitor_number, cur_monitor, desired_state)
+        update_monitor_state(config, monitor, desired_state)
 
 
 def run_kvm(kvm_config: KVMConfig):
     """ Entrypoint into the KVM """
-    get_controllable_monitors()
+    kvm_config.monitors.sort(key=lambda m: m.number)
+    global KVM_CONFIG
+    KVM_CONFIG = kvm_config
+    build_monitor_config_map()
     usb_connected = is_usb_connected(kvm_config.usb_device)
-    handle_monitor_updates(kvm_config, usb_connected)
+    handle_monitor_updates(usb_connected)
     time.sleep(1)
     while True:
         if usb_connected != is_usb_connected(kvm_config.usb_device):
             usb_connected = not usb_connected
             print(f"USB device {'connected ' if usb_connected else 'disconnected'}")
-            handle_monitor_updates(kvm_config, usb_connected)
+            handle_monitor_updates(usb_connected)
 
 
 def print_connected_monitor_info():
@@ -142,9 +171,8 @@ def print_connected_monitor_info():
         If a monitor cannot be controlled by monitorcontrol, a warning message will be displayed for that monitor.
     """
     print("---------------Monitors---------------")
-    controllable_monitors = get_controllable_monitors()
     for i, monitor in enumerate(get_monitors()):
-        if not controllable_monitors[i]:
+        if not poll_if_monitor_controllable(monitor):
             print(f'Monitor {i}: Due to an unknown hardware or software issue, this monitor cannot be controlled via this program.')
             continue
         with monitor:
@@ -216,9 +244,8 @@ def run_config_creator():
     print("--------------------------------------")
     print(f'Supported states are: {[state.value for state in MonitorState]}')
     monitor_configs: List[MonitorConfig] = []
-    controllable_monitors = get_controllable_monitors()
     for i, monitor in enumerate(monitors):
-        controllable = controllable_monitors[i]
+        controllable = poll_if_monitor_controllable(monitor)
         monitor_name = 'Unknown'
         if controllable:
             with monitor:
@@ -261,6 +288,8 @@ if __name__ == '__main__':
         run_kvm(kvm_config)
     except KVMException as e:
         print(f'An error occurred while running KVM: {e}. Exiting.')
+    except Exception:
+        run_kvm(kvm_config)
 
 
 # if __name__ == "__main__":
